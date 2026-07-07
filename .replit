@@ -1,0 +1,67 @@
+modules = ["nodejs-24", "python-3.11"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Vuka USSD Backend"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Vuka Treasury Dashboard"
+
+[[workflows.workflow]]
+name = "Vuka USSD Backend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd services/ussd-backend && python3 main.py"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Vuka Treasury Dashboard"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd services/vuka-dashboard && streamlit run app.py --server.port 8008 --server.headless true --server.address 0.0.0.0"
+waitForPort = 8008
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[nix]
+channel = "stable-25_05"
+packages = ["fontconfig", "ghostscript", "glib", "glibcLocales", "harfbuzz", "pango"]
+
+[userenv]
+
+[userenv.shared]
+DARAJA_ENV = "sandbox"
+VUKA_LOCAL_WATCHLIST = "254733999888"
