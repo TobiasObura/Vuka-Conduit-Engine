@@ -9,7 +9,7 @@ the only thing that ever gets sent to Gemini.
 """
 import logging
 
-from . import ai_gemini, config, ledger
+from . import ai_gemini, ledger
 
 logger = logging.getLogger("vuka.ai_treasury")
 

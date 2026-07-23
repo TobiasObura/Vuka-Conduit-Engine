@@ -12,7 +12,6 @@ Falls back to a clearly-logged simulation when not configured -- never
 silently pretends to be live.
 """
 import logging
-import time
 
 import requests
 

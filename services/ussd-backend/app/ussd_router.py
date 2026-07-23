@@ -40,7 +40,6 @@ STAGE_RECIPIENT_NAME = "recipient_name"
 STAGE_AMOUNT = "amount"
 STAGE_CONFIRM = "confirm"
 STAGE_OTP = "otp"
-STAGE_DONE = "done"
 
 STRINGS = {
     "EN": {
