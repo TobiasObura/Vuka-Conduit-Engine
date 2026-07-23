@@ -93,6 +93,17 @@ THUNES_ACCEPT_CONFIGURED = bool(THUNES_API_KEY and THUNES_API_SECRET and THUNES_
 THUNES_USDC_MODE = os.environ.get("THUNES_USDC_MODE", "").lower() in ("true", "1", "yes")
 THUNES_ACCOUNT_ID = os.environ.get("THUNES_ACCOUNT_ID")
 
+# --- Rafiki (NALA) -- REDUNDANT payout fallback, not a Thunes replacement ---
+# Only invoked when a live Thunes dispatch attempt actually fails at runtime
+# (timeout/5xx/network error) -- see bank_adapters.dispatch_payout(). NALA has
+# not published a public developer API reference as of this writing; the
+# request/response shape in rafiki_payout.py is Vuka's own placeholder and
+# needs confirming against NALA's real docs once a commercial relationship
+# and API access exist.
+RAFIKI_API_KEY = os.environ.get("RAFIKI_API_KEY")
+RAFIKI_SECRET = os.environ.get("RAFIKI_SECRET")
+RAFIKI_CONFIGURED = bool(RAFIKI_API_KEY and RAFIKI_SECRET)
+
 # ---------------------------------------------------------------------------
 # Collection -- Onafriq hub (all non-Safaricom senders)
 # ---------------------------------------------------------------------------

@@ -41,9 +41,20 @@ def _sign(signing_secret: str, body: dict) -> str:
 def dispatch_payout(tx_id: str, corridor: str, recipient_phone: str, recipient_name: str,
                      payout_amount: float, payout_currency: str) -> dict:
     if config.THUNES_CONFIGURED:
-        return thunes_payout.dispatch_payout(
+        result = thunes_payout.dispatch_payout(
             tx_id, corridor, recipient_phone, recipient_name, payout_amount, payout_currency
         )
+        if result["status"] == "failed" and config.RAFIKI_CONFIGURED:
+            logger.warning(
+                "bank_adapters: primary Thunes payout failed for tx %s -- retrying "
+                "via Rafiki redundant rail", tx_id,
+            )
+            from . import rafiki_payout
+            result = rafiki_payout.dispatch_payout(
+                tx_id, corridor, recipient_phone, recipient_name, payout_amount, payout_currency
+            )
+            result["retried_from"] = "thunes"
+        return result
 
     partner = config.BANK_PARTNERS.get(corridor)
     if partner and partner["payout_configured"]:
