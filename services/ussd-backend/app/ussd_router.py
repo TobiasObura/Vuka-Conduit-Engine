@@ -52,6 +52,20 @@ STRINGS = {
         "otp_invalid": "Incorrect OTP. Please try again.",
         "hold": "Your transaction is under review. You will be notified once cleared.",
         "session_expired": "Session expired. Please dial again.",
+        "send_to_header": "Send to:",
+        "country_KENYA": "Kenya",
+        "country_UGANDA": "Uganda",
+        "country_TANZANIA": "Tanzania",
+        "country_RWANDA": "Rwanda",
+        "country_GHANA": "Ghana",
+        "ask_amount_convert": "Enter amount in {currency} for {name} to receive:",
+        "ask_amount_merchant": "Enter amount in {currency} to pay {name}:",
+        "confirm_convert": ("{name} receives: {payout}\n"
+                             "You pay: {debit} (fees included)\n"
+                             "A bank would charge you ~{bank_debit} for the same delivery\n"
+                             "You save: ~{savings}\n1. Confirm\n2. Cancel"),
+        "confirm_merchant": "Pay {currency} {amount} to {name}\n1. Confirm\n2. Cancel",
+        "known_recipient_confirm": "Pay {name} (used before)?\n1. Yes\n2. No, enter a different name",
     },
     "FR": {
         "main_menu": "Menu Vuka\n1. Convertir et Transferer\n2. Numero Rapide\n3. Taux du Marche\n4. Paiement Marchand",
@@ -62,6 +76,20 @@ STRINGS = {
         "otp_invalid": "Code OTP incorrect. Veuillez reessayer.",
         "hold": "Votre transaction est en cours de verification.",
         "session_expired": "Session expiree. Veuillez recomposer.",
+        "send_to_header": "Envoyer vers:",
+        "country_KENYA": "Kenya",
+        "country_UGANDA": "Ouganda",
+        "country_TANZANIA": "Tanzanie",
+        "country_RWANDA": "Rwanda",
+        "country_GHANA": "Ghana",
+        "ask_amount_convert": "Entrez le montant en {currency} pour que {name} recoive:",
+        "ask_amount_merchant": "Entrez le montant en {currency} pour payer {name}:",
+        "confirm_convert": ("{name} recoit: {payout}\n"
+                             "Vous payez: {debit} (frais inclus)\n"
+                             "Une banque vous facturerait ~{bank_debit} pour la meme livraison\n"
+                             "Vous economisez: ~{savings}\n1. Confirmer\n2. Annuler"),
+        "confirm_merchant": "Payer {currency} {amount} a {name}\n1. Confirmer\n2. Annuler",
+        "known_recipient_confirm": "Payer {name} (utilise avant)?\n1. Oui\n2. Non, entrer un nom different",
     },
 }
 
@@ -85,6 +113,36 @@ def _render_language_page(page: int) -> str:
     return header + "\n" + "\n".join(lines)
 
 
+PAGE_SIZE = 8  # destination-corridor pagination, matches ai_language.py's own page size
+
+
+def _country_name(sess, corridor):
+    """Localized country name if available (currently only the original 5
+    corridors have translated country_X entries), else the English name from
+    config.CORRIDORS -- never a guessed translation for the newer corridors."""
+    try:
+        return _s(sess, f"country_{corridor}")
+    except KeyError:
+        return config.CORRIDORS[corridor]["country"]
+
+
+def _render_corridor_page(sess, page):
+    """Paginated destination-corridor menu -- same pattern as the language
+    menu (8 per page, 9=more, 0=back), needed now that there are up to 18
+    destination options for a single sender."""
+    options = sess.get("corridor_menu_options") or []
+    start = page * PAGE_SIZE
+    subset = options[start:start + PAGE_SIZE]
+    lines = [f"{i+1}. {_country_name(sess, c)}" for i, c in enumerate(subset)]
+    has_more = (start + PAGE_SIZE) < len(options)
+    has_back = page > 0
+    if has_more:
+        lines.append("9. More")
+    if has_back:
+        lines.append("0. Back")
+    return _s(sess, "send_to_header") + "\n" + "\n".join(lines)
+
+
 def _new_session():
     return {
         "stage": STAGE_LANGUAGE,
@@ -94,6 +152,7 @@ def _new_session():
         "transaction_type": None,
         "corridor": None,
         "corridor_menu_options": None,
+        "corridor_page": 0,
         "recipient_phone": None,
         "recipient_name": None,
         "amount": None,
@@ -213,10 +272,8 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
             sess["stage"] = STAGE_CORRIDOR
             destinations = [c for c in config.ALL_CORRIDORS_ORDER if c != sess["origin_corridor"]]
             sess["corridor_menu_options"] = destinations
-            menu_lines = "\n".join(
-                f"{i+1}. {config.CORRIDORS[c]['country']}" for i, c in enumerate(destinations)
-            )
-            return _con(f"Send to:\n{menu_lines}")
+            sess["corridor_page"] = 0
+            return _con(_render_corridor_page(sess, 0))
         elif user_input == "4":
             sess["transaction_type"] = "merchant_payment"
             sess["stage"] = STAGE_RECIPIENT_PHONE
@@ -230,12 +287,24 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
 
     if stage == STAGE_CORRIDOR:
         options = sess.get("corridor_menu_options") or []
-        idx_map = {str(i + 1): c for i, c in enumerate(options)}
-        chosen = idx_map.get(user_input)
-        if chosen is None:
-            menu_lines = "\n".join(f"{i+1}. {config.CORRIDORS[c]['country']}" for i, c in enumerate(options))
-            return _con(_s(sess, "invalid") + f"\nSend to:\n{menu_lines}")
-        sess["corridor"] = chosen
+        page = sess.get("corridor_page", 0)
+        start = page * PAGE_SIZE
+        subset = options[start:start + PAGE_SIZE]
+        has_more = (start + PAGE_SIZE) < len(options)
+        has_back = page > 0
+
+        if user_input == "9" and has_more:
+            sess["corridor_page"] = page + 1
+            return _con(_render_corridor_page(sess, sess["corridor_page"]))
+        if user_input == "0" and has_back:
+            sess["corridor_page"] = page - 1
+            return _con(_render_corridor_page(sess, sess["corridor_page"]))
+
+        idx = int(user_input) - 1 if user_input.isdigit() else None
+        if idx is None or not (0 <= idx < len(subset)):
+            return _con(_s(sess, "invalid") + "\n" + _render_corridor_page(sess, page))
+
+        sess["corridor"] = subset[idx]
         sess["stage"] = STAGE_RECIPIENT_PHONE
         return _con(_s(sess, "ask_recipient_phone"))
 
@@ -249,7 +318,7 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
             known_name = known["recipient_name"]
             sess["_known_recipient_name"] = known_name
             sess["stage"] = STAGE_CONFIRM_KNOWN_RECIPIENT
-            return _con(f"Pay {known_name} (used before)?\n1. Yes\n2. No, enter a different name")
+            return _con(_s(sess, "known_recipient_confirm").format(name=known_name))
 
         sess["stage"] = STAGE_RECIPIENT_NAME
         return _con(_s(sess, "ask_recipient_name"))
@@ -262,15 +331,15 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
             sess["stage"] = STAGE_AMOUNT
             if sess["transaction_type"] == "convert_transact":
                 currency = config.CORRIDORS[sess["corridor"]]["currency"]
-                return _con(f"Enter amount in {currency} for {known_name} to receive:")
+                return _con(_s(sess, "ask_amount_convert").format(currency=currency, name=known_name))
             origin_currency = config.CORRIDORS[sess["origin_corridor"]]["currency"]
-            return _con(f"Enter amount in {origin_currency} to pay {known_name}:")
+            return _con(_s(sess, "ask_amount_merchant").format(currency=origin_currency, name=known_name))
         elif user_input == "2":
             sess.pop("_known_recipient_name", None)
             sess["stage"] = STAGE_RECIPIENT_NAME
             return _con(_s(sess, "ask_recipient_name"))
         else:
-            return _con(_s(sess, "invalid") + f"\nPay {known_name} (used before)?\n1. Yes\n2. No, enter a different name")
+            return _con(_s(sess, "invalid") + "\n" + _s(sess, "known_recipient_confirm").format(name=known_name))
 
     if stage == STAGE_RECIPIENT_NAME:
         if not user_input:
@@ -280,11 +349,11 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
 
         if sess["transaction_type"] == "convert_transact":
             currency = config.CORRIDORS[sess["corridor"]]["currency"]
-            return _con(f"Enter amount in {currency} for {sess['recipient_name']} to receive:")
+            return _con(_s(sess, "ask_amount_convert").format(currency=currency, name=sess["recipient_name"]))
         # Merchant Payment: same-country, charged in the sender's own origin currency
         # (a Ghanaian sender paying a Ghanaian merchant pays in GHS, not KES).
         origin_currency = config.CORRIDORS[sess["origin_corridor"]]["currency"]
-        return _con(f"Enter amount in {origin_currency} to pay {sess['recipient_name']}:")
+        return _con(_s(sess, "ask_amount_merchant").format(currency=origin_currency, name=sess["recipient_name"]))
 
     if stage == STAGE_AMOUNT:
         try:
@@ -293,10 +362,10 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
         except (ValueError, AssertionError):
             if sess["transaction_type"] == "convert_transact":
                 currency = config.CORRIDORS[sess["corridor"]]["currency"]
-                retry_prompt = f"Enter amount in {currency} for {sess['recipient_name']} to receive:"
+                retry_prompt = _s(sess, "ask_amount_convert").format(currency=currency, name=sess["recipient_name"])
             else:
                 origin_currency = config.CORRIDORS[sess["origin_corridor"]]["currency"]
-                retry_prompt = f"Enter amount in {origin_currency} to pay {sess['recipient_name']}:"
+                retry_prompt = _s(sess, "ask_amount_merchant").format(currency=origin_currency, name=sess["recipient_name"])
             return _con(_s(sess, "invalid") + "\n" + retry_prompt)
         sess["amount"] = amount
         sess["stage"] = STAGE_CONFIRM
@@ -308,18 +377,17 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
             # currency, fees added on top.
             quote = fx.get_quote_for_recipient(sess["origin_corridor"], sess["corridor"], amount)
             sess["quote"] = quote
-            msg = (
-                f"{sess['recipient_name']} receives: {quote['payout_amount']:,.2f} {quote['payout_currency']}\n"
-                f"You pay: {quote['origin_currency']} {quote['sender_debit']:,.2f} (fees included)\n"
-                f"A bank would charge you ~{quote['origin_currency']} {quote['bank_debit']:,.2f} for the same delivery\n"
-                f"You save: ~{quote['origin_currency']} {quote['savings_vs_bank']:,.2f}\n"
-                f"1. Confirm\n2. Cancel"
+            msg = _s(sess, "confirm_convert").format(
+                name=sess["recipient_name"],
+                payout=f"{quote['payout_amount']:,.2f} {quote['payout_currency']}",
+                debit=f"{quote['origin_currency']} {quote['sender_debit']:,.2f}",
+                bank_debit=f"{quote['origin_currency']} {quote['bank_debit']:,.2f}",
+                savings=f"{quote['origin_currency']} {quote['savings_vs_bank']:,.2f}",
             )
         else:
             origin_currency = config.CORRIDORS[sess["origin_corridor"]]["currency"]
-            msg = (
-                f"Pay {origin_currency} {amount:,.0f} to {sess['recipient_name']}\n"
-                f"1. Confirm\n2. Cancel"
+            msg = _s(sess, "confirm_merchant").format(
+                currency=origin_currency, amount=f"{amount:,.0f}", name=sess["recipient_name"]
             )
         return _con(msg)
 

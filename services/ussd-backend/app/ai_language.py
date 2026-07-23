@@ -104,9 +104,12 @@ def _translate_via_gemini(language_code: str) -> dict:
             f"Translate the following USSD menu strings from English into "
             f"{full_name}. Keep numbered menu options "
             f"(e.g. '1. Convert & Transact') in the same numbered format, "
-            f"just translate the option text. Reply with ONLY a JSON object "
-            f"with the exact same keys as the input, values being the "
-            f"translated strings, no other commentary:\n\n{json.dumps(base)}"
+            f"just translate the option text. IMPORTANT: some strings contain "
+            f"placeholder tokens in curly braces, like {{name}} or {{currency}} -- "
+            f"copy these tokens EXACTLY as they appear, character for character, "
+            f"do not translate or alter anything inside the curly braces. Reply "
+            f"with ONLY a JSON object with the exact same keys as the input, "
+            f"values being the translated strings, no other commentary:\n\n{json.dumps(base)}"
         )
         raw = ai_gemini.generate_content(prompt, response_mime_type="application/json")
         translated = json.loads(raw)

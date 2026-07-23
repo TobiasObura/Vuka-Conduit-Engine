@@ -136,7 +136,19 @@ def init_db():
         # not a Kenya-only hub), so it's seeded the same way as the other four
         # rather than as a separate informational-only row. XOF is seeded as a
         # placeholder for the expansion belt (never paid out from directly yet).
+        # Phase 1 XOF/XAF corridors deliberately get weight 0 -- there's no real
+        # remittance-inflow data backing a plausible-looking starting balance for
+        # these markets (unlike the original 5, which used real World Bank
+        # figures), so seeding them with a fabricated number would be worse than
+        # seeding them empty. They'll show a real 0 balance and a LOW float
+        # warning on the dashboard until someone actually funds them.
         _SEED_WEIGHTS = {"KENYA": 4.2, "UGANDA": 1.4, "TANZANIA": 0.7, "RWANDA": 0.5, "GHANA": 4.6}
+        _PHASE1_ZERO_SEED = [
+            "BENIN", "BURKINA_FASO", "COTE_DIVOIRE", "GUINEA_BISSAU", "MALI", "NIGER", "SENEGAL", "TOGO",
+            "CAMEROON", "CENTRAL_AFRICAN_REPUBLIC", "CHAD", "CONGO_BRAZZAVILLE", "EQUATORIAL_GUINEA", "GABON",
+        ]
+        for _z in _PHASE1_ZERO_SEED:
+            _SEED_WEIGHTS[_z] = 0.0
         _SEED_UNIT = 5_000_000  # demo-scale base unit, in each corridor's local currency
         for corridor, meta in config.CORRIDORS.items():
             seed_balance = _SEED_WEIGHTS.get(corridor, 1.0) * _SEED_UNIT

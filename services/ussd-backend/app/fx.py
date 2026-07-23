@@ -35,12 +35,23 @@ from . import config, ledger
 # anchor for computing cross-rates -- KES has no special status to any caller
 # of get_quote_for_recipient(); it's just the currency this table happened to
 # be built relative to.
+# XOF and XAF are both fixed at exactly 655.957 per EUR (a real, stable peg
+# since 1999 -- not an estimate). Derived from a real KES-EUR rate checked
+# July 2026 (~147.6 KES per EUR): 655.957 / 147.6 = 4.44. Both currency zones
+# share the same rate since they share the same EUR peg.
+_CFA_RATE = 4.44  # 1 KES ~= 4.44 XOF or XAF
+
 _RATES_FROM_KES = {
     "KENYA": 1.0,
     "UGANDA": 28.4,     # 1 KES ~= 28.4 UGX
     "TANZANIA": 18.1,   # 1 KES ~= 18.1 TZS
     "RWANDA": 10.3,     # 1 KES ~= 10.3 RWF
     "GHANA": 0.11,      # 1 KES ~= 0.11 GHS
+    "BENIN": _CFA_RATE, "BURKINA_FASO": _CFA_RATE, "COTE_DIVOIRE": _CFA_RATE,
+    "GUINEA_BISSAU": _CFA_RATE, "MALI": _CFA_RATE, "NIGER": _CFA_RATE,
+    "SENEGAL": _CFA_RATE, "TOGO": _CFA_RATE,
+    "CAMEROON": _CFA_RATE, "CENTRAL_AFRICAN_REPUBLIC": _CFA_RATE, "CHAD": _CFA_RATE,
+    "CONGO_BRAZZAVILLE": _CFA_RATE, "EQUATORIAL_GUINEA": _CFA_RATE, "GABON": _CFA_RATE,
 }
 
 DEFAULT_VUKA_MARGIN_BPS = config.DEFAULT_VUKA_MARGIN_BPS

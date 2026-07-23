@@ -58,9 +58,52 @@ CORRIDORS = {
     },
 }
 
+# --- Phase 1 expansion: XOF and XAF currency-zone countries within Ecobank's
+# footprint (source: Ecobank's own investor materials list 36 countries;
+# see GO_LIVE_CHECKLIST-adjacent notes). Added as DESTINATION-ONLY corridors --
+# deliberately NOT added to network_profiles.py, so no sender's origin can ever
+# resolve to one of these (falls through to the safe KENYA default like any
+# unrecognized network code). This is a genuine safety choice, not an oversight:
+# carrier detection (MCC-MNC codes) for these markets hasn't been verified, so
+# rather than guess and risk silently misrouting a real sender, they can only
+# ever be a RECIPIENT's country for now, never a claimed origin.
+#
+# soft_cap values are illustrative placeholders (not sourced from any real
+# regulatory threshold for these markets) -- same honest caveat that already
+# applies to the original 5 corridors' soft caps, now explicitly extended here.
+# thunes_service_id_env follows the existing naming pattern but Thunes coverage
+# of these specific markets has NOT been independently confirmed -- verify with
+# Thunes directly before assuming any of these can go live.
+_XOF_COUNTRIES = {
+    "BENIN": "Benin", "BURKINA_FASO": "Burkina Faso", "COTE_DIVOIRE": "Cote d'Ivoire",
+    "GUINEA_BISSAU": "Guinea-Bissau", "MALI": "Mali", "NIGER": "Niger",
+    "SENEGAL": "Senegal", "TOGO": "Togo",
+}
+_XAF_COUNTRIES = {
+    "CAMEROON": "Cameroon", "CENTRAL_AFRICAN_REPUBLIC": "Central African Republic",
+    "CHAD": "Chad", "CONGO_BRAZZAVILLE": "Congo (Brazzaville)",
+    "EQUATORIAL_GUINEA": "Equatorial Guinea", "GABON": "Gabon",
+}
+for _code, _name in _XOF_COUNTRIES.items():
+    CORRIDORS[_code] = {
+        "country": _name, "currency": "XOF", "soft_cap": 500_000,
+        "thunes_service_id_env": f"THUNES_SERVICE_ID_{_code}",
+    }
+for _code, _name in _XAF_COUNTRIES.items():
+    CORRIDORS[_code] = {
+        "country": _name, "currency": "XAF", "soft_cap": 500_000,
+        "thunes_service_id_env": f"THUNES_SERVICE_ID_{_code}",
+    }
+
 # Fixed display order for menus -- the destination menu shown to any sender is
-# this list with their own detected origin corridor removed (always leaves 4).
-ALL_CORRIDORS_ORDER = ["KENYA", "UGANDA", "TANZANIA", "RWANDA", "GHANA"]
+# this list with their own detected origin corridor removed. Now large enough
+# (19 corridors) that the USSD destination menu is PAGINATED -- see
+# ussd_router.py's corridor selection, which mirrors the language menu pattern.
+ALL_CORRIDORS_ORDER = (
+    ["KENYA", "UGANDA", "TANZANIA", "RWANDA", "GHANA"]
+    + list(_XOF_COUNTRIES.keys())
+    + list(_XAF_COUNTRIES.keys())
+)
 
 # ---------------------------------------------------------------------------
 # Thunes DGN (primary payout, all corridors)
