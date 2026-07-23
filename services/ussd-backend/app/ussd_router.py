@@ -43,10 +43,6 @@ STAGE_DONE = "done"
 
 STRINGS = {
     "EN": {
-        "language_prompt": (
-            "Welcome to Vuka\n1. English\n2. Francais\n3. Kiswahili\n"
-            "4. Hausa\n5. Twi\n6. Kinyarwanda"
-        ),
         "main_menu": "Vuka Menu\n1. Convert & Transact\n2. Speed Dial\n3. Market Rates\n4. Merchant Payment",
         "ask_recipient_phone": "Enter recipient phone number:",
         "ask_recipient_name": "Enter recipient name:",
@@ -57,10 +53,6 @@ STRINGS = {
         "session_expired": "Session expired. Please dial again.",
     },
     "FR": {
-        "language_prompt": (
-            "Bienvenue chez Vuka\n1. English\n2. Francais\n3. Kiswahili\n"
-            "4. Hausa\n5. Twi\n6. Kinyarwanda"
-        ),
         "main_menu": "Menu Vuka\n1. Convertir et Transferer\n2. Numero Rapide\n3. Taux du Marche\n4. Paiement Marchand",
         "ask_recipient_phone": "Entrez le numero du destinataire:",
         "ask_recipient_name": "Entrez le nom du destinataire:",
@@ -72,14 +64,31 @@ STRINGS = {
     },
 }
 
-# Maps the digit typed at the language menu to ai_language.py's language codes.
-LANGUAGE_MENU_ORDER = ["EN", "FR", "SW", "HA", "TW", "RW"]
+
+def _render_language_page(page: int) -> str:
+    """Builds the language-selection screen for the given page. Digits 1-8
+    are language choices; 9 (if shown) advances to the next page; 0 (if
+    shown) goes back to the previous page. See ai_language.py for the full
+    language catalog -- this stays in sync with it automatically."""
+    from . import ai_language
+
+    options = ai_language.get_page(page)
+    lines = [f"{i+1}. {name}" for i, (code, name) in enumerate(options)]
+    has_more = page < ai_language.total_pages() - 1
+    has_back = page > 0
+    if has_more:
+        lines.append("9. More languages")
+    if has_back:
+        lines.append("0. Back")
+    header = "Welcome to Vuka" if page == 0 else "More languages"
+    return header + "\n" + "\n".join(lines)
 
 
 def _new_session():
     return {
         "stage": STAGE_LANGUAGE,
         "language": "EN",
+        "language_page": 0,
         "origin_corridor": None,
         "transaction_type": None,
         "corridor": None,
@@ -163,13 +172,28 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
 
     # First touch of a fresh session: text is empty, show the language prompt.
     if stage == STAGE_LANGUAGE and user_input == "":
-        return _con(_s(sess, "language_prompt"))
+        return _con(_render_language_page(sess["language_page"]))
 
     if stage == STAGE_LANGUAGE:
-        idx = {"1": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5}.get(user_input)
-        if idx is None:
-            return _con(_s(sess, "invalid") + "\n" + _s(sess, "language_prompt"))
-        sess["language"] = LANGUAGE_MENU_ORDER[idx]
+        from . import ai_language
+
+        page = sess["language_page"]
+        options = ai_language.get_page(page)
+        has_more = page < ai_language.total_pages() - 1
+        has_back = page > 0
+
+        if user_input == "9" and has_more:
+            sess["language_page"] = page + 1
+            return _con(_render_language_page(sess["language_page"]))
+        if user_input == "0" and has_back:
+            sess["language_page"] = page - 1
+            return _con(_render_language_page(sess["language_page"]))
+
+        idx = int(user_input) - 1 if user_input.isdigit() else None
+        if idx is None or not (0 <= idx < len(options)):
+            return _con(_s(sess, "invalid") + "\n" + _render_language_page(page))
+
+        sess["language"] = options[idx][0]
         # Detect the sender's origin corridor from their network code. Vuka is
         # pan-African, not a Kenya-only hub -- this determines both which
         # currency Merchant Payment charges in and which corridor is excluded

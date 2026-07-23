@@ -19,6 +19,9 @@ import hashlib
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
+from dotenv import load_dotenv
+
+load_dotenv()
 
 SESSION_SECRET = os.environ.get("SESSION_SECRET")
 

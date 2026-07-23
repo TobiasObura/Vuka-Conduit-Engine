@@ -33,7 +33,8 @@ def build_privacy_safe_summary() -> dict:
         corridor_volumes = conn.execute(
             """SELECT corridor, payout_currency AS currency, COUNT(*) tx_count,
                       COALESCE(SUM(payout_amount),0) total_payout
-               FROM transactions WHERE corridor IS NOT NULL GROUP BY corridor"""
+               FROM transactions WHERE corridor IS NOT NULL AND status = 'complete'
+               GROUP BY corridor"""
         ).fetchall()
         revenue_by_currency = conn.execute(
             """SELECT send_currency AS currency,

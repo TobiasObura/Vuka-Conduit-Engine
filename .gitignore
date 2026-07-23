@@ -1,0 +1,15 @@
+# Secrets -- never commit real credentials
+.env
+.env.local
+*.env
+
+# Local SQLite ledger -- generated at runtime, not source
+services/ussd-backend/app/data/*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# uv
+.python-version

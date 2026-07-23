@@ -10,6 +10,10 @@ should check it explicitly rather than re-deriving it from raw env lookups.
 """
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()  # picks up a .env file in the working directory, if present
+
 # ---------------------------------------------------------------------------
 # Corridors
 # ---------------------------------------------------------------------------

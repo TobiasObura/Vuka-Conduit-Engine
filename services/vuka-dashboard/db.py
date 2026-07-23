@@ -120,7 +120,7 @@ def get_corridor_volumes() -> list:
             """SELECT corridor, payout_currency AS currency, COUNT(*) as tx_count,
                       COALESCE(SUM(payout_amount), 0) as total_payout
                FROM transactions
-               WHERE corridor IS NOT NULL
+               WHERE corridor IS NOT NULL AND status = 'complete'
                GROUP BY corridor
                ORDER BY total_payout DESC"""
         ).fetchall()

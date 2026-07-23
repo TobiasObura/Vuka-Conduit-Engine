@@ -4,6 +4,9 @@ import time
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import db
 import whatsapp_alerts
