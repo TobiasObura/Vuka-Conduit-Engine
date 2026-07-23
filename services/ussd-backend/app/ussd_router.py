@@ -35,6 +35,7 @@ STAGE_LANGUAGE = "language"
 STAGE_MAIN_MENU = "main_menu"
 STAGE_CORRIDOR = "corridor"
 STAGE_RECIPIENT_PHONE = "recipient_phone"
+STAGE_CONFIRM_KNOWN_RECIPIENT = "confirm_known_recipient"
 STAGE_RECIPIENT_NAME = "recipient_name"
 STAGE_AMOUNT = "amount"
 STAGE_CONFIRM = "confirm"
@@ -242,8 +243,34 @@ def _dispatch(sess: dict, user_input: str, phone_number: str, network_code: str)
         if not user_input.lstrip("+").isdigit() or len(user_input) < 9:
             return _con(_s(sess, "invalid") + "\n" + _s(sess, "ask_recipient_phone"))
         sess["recipient_phone"] = user_input
+
+        known = ledger.lookup_known_recipient(phone_number, user_input, sess.get("corridor"))
+        if known:
+            known_name = known["recipient_name"]
+            sess["_known_recipient_name"] = known_name
+            sess["stage"] = STAGE_CONFIRM_KNOWN_RECIPIENT
+            return _con(f"Pay {known_name} (used before)?\n1. Yes\n2. No, enter a different name")
+
         sess["stage"] = STAGE_RECIPIENT_NAME
         return _con(_s(sess, "ask_recipient_name"))
+
+    if stage == STAGE_CONFIRM_KNOWN_RECIPIENT:
+        known_name = sess.get("_known_recipient_name", "")
+        if user_input == "1":
+            sess["recipient_name"] = known_name
+            sess.pop("_known_recipient_name", None)
+            sess["stage"] = STAGE_AMOUNT
+            if sess["transaction_type"] == "convert_transact":
+                currency = config.CORRIDORS[sess["corridor"]]["currency"]
+                return _con(f"Enter amount in {currency} for {known_name} to receive:")
+            origin_currency = config.CORRIDORS[sess["origin_corridor"]]["currency"]
+            return _con(f"Enter amount in {origin_currency} to pay {known_name}:")
+        elif user_input == "2":
+            sess.pop("_known_recipient_name", None)
+            sess["stage"] = STAGE_RECIPIENT_NAME
+            return _con(_s(sess, "ask_recipient_name"))
+        else:
+            return _con(_s(sess, "invalid") + f"\nPay {known_name} (used before)?\n1. Yes\n2. No, enter a different name")
 
     if stage == STAGE_RECIPIENT_NAME:
         if not user_input:

@@ -304,6 +304,38 @@ def phone_on_local_watchlist(phone: str, watchlist: list) -> bool:
     return phone in watchlist
 
 
+def lookup_known_recipient(sender_phone: str, recipient_phone: str, corridor: str = None) -> dict:
+    """Vuka ID: looks up the most recent name THIS SENDER used for this exact
+    recipient phone number in a past COMPLETED transaction, scoped to the same
+    corridor (or NULL corridor for merchant payments -- a different context).
+    Deliberately never looks across different senders' histories for the same
+    phone number -- that would leak one sender's relationship/naming for a
+    number to a totally different sender, a real privacy problem even though
+    the phone number itself isn't secret. The returned name is still
+    self-reported (by this same sender, previously) -- never independently
+    verified against an ID, same caveat as a freshly-typed name."""
+    sender_hash = crypto.phone_blind_index(sender_phone)
+    recipient_hash = crypto.phone_blind_index(recipient_phone)
+    with get_conn() as conn:
+        if corridor:
+            row = conn.execute(
+                """SELECT recipient_name FROM transactions
+                   WHERE sender_phone_hash = ? AND recipient_phone_hash = ?
+                     AND corridor = ? AND status = 'complete' AND recipient_name IS NOT NULL
+                   ORDER BY created_at DESC LIMIT 1""",
+                (sender_hash, recipient_hash, corridor),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """SELECT recipient_name FROM transactions
+                   WHERE sender_phone_hash = ? AND recipient_phone_hash = ?
+                     AND corridor IS NULL AND status = 'complete' AND recipient_name IS NOT NULL
+                   ORDER BY created_at DESC LIMIT 1""",
+                (sender_hash, recipient_hash),
+            ).fetchone()
+    return {"recipient_name": row["recipient_name"]} if row else None
+
+
 def record_compliance_flag(tx_id: str, rule: str, severity: str, note: str, simulated: bool = False) -> str:
     flag_id = str(uuid.uuid4())
     with get_conn() as conn:
